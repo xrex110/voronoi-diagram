@@ -8,7 +8,7 @@
 #include <ctime>
 #include <SDL2/SDL.h>
 
-#include "cell.hpp"
+#include "GEOM.hpp"
 
 //Look up remove/erase idiom for explanation for this macro
 #define REMOVE_ELEM_FROM_VECTOR(vec, elem) vec.erase(std::remove(vec.begin(), vec.end(), elem), vec.end())

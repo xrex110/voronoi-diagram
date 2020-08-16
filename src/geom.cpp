@@ -3,7 +3,7 @@
 #include <cmath>
 #include <vector>
 
-#include "cell.hpp"
+#include "geom.hpp"
 
 //Point class
 Point::Point() : x(0), y(0) {}

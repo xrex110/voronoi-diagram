@@ -1,5 +1,5 @@
-#ifndef CELL_H
-#define CELL_H
+#ifndef GEOM_H
+#define GEOM_H
 
 #include <vector>
 #include <iostream>
