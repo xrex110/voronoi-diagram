@@ -3,7 +3,15 @@
 #include <cmath>
 #include <vector>
 
+#include <SDL2/SDL.h>
+
 #include "geom.hpp"
+
+extern SDL_Renderer* renderer;
+
+bool compareDoubles(double x, double y) {
+    return abs(x - y) <= EPSILON;
+}
 
 //Point class
 Point::Point() : x(0), y(0) {}
@@ -11,7 +19,7 @@ Point::Point() : x(0), y(0) {}
 Point::Point(double a, double b) : x(a), y(b) {}
 
 bool Point::operator==(Point pt) {
-    return (this->x == pt.x && this->y == pt.y);
+    return (compareDoubles(x, pt.x) && compareDoubles(y, pt.y));
 }
 
 bool Point::operator<(Point pt) {
@@ -32,7 +40,7 @@ Line::Line(Point a, Point b) {
     //Equation of a line is y = mx + c
     //=> c = y - mx
     //Slope = y1 - y2 / x1 - x2
-    if(a.x - b.x == 0) {
+    if(compareDoubles(a.x, b.x)) {
         is_vertical = true;
         vert_x = a.x;
         this->slope = 0;
@@ -48,7 +56,7 @@ Line::Line(Point a, Point b) {
 
 Line::Line(double slope, double y_intercept, bool is_vert, double vert_x) {
     if(is_vert) {
-        this->vert_x = true;
+        this->is_vertical = true;
         this->vert_x = vert_x;
         this->slope = 0;
         this->y_intercept = 0;
@@ -112,8 +120,10 @@ Line LineSegment::perpendicularBisector() {
     if(this->line.is_vertical) {
         p_slope = 0;
         p_y_intercept = mid.y;
+        p_is_vertical = false;
+        p_vert_x = 0;
     }
-    else if(this->line.slope == 0) {
+    else if(line.slope == 0.0) {
         p_is_vertical = true;
         p_vert_x = mid.x;
         p_slope = 0;
@@ -141,7 +151,17 @@ std::ostream& operator<<(std::ostream& os, LineSegment p) {
 Circle::Circle(Point cent, double rad) : center(cent), radius(rad) {}
 
 bool Circle::isPointInside(Point a) {
-    return (this->center.distance(a) <= this->radius) ;
+    double dist = pow(center.x - a.x, 2) + pow(center.y - a.y, 2);
+    return (compareDoubles(dist, pow(radius, 2)) || dist < pow(radius, 2));
+}
+
+bool Circle::isPointInside2(Point a) {
+    double dist = pow(center.x - a.x, 2) + pow(center.y - a.y, 2);
+    double rad2 = pow(radius, 2);
+    /*if(dist < rad2 && !compareDoubles(dist, rad2)) {
+        SDL_RenderDrawLineF(renderer, center.x, center.y, a.x, a.y);
+    }*/
+    return (dist < rad2  && !compareDoubles(dist, rad2));
 }
 
 std::ostream& operator<<(std::ostream& os, Circle p) {
@@ -168,8 +188,24 @@ Circle Triangle::circumcircle() {
     //triangle. The radius can then be found by calculating the distance
     //between the circumcenter and any vertex of the triangle
 
-    Point circumcenter = sideA.perpendicularBisector().intersection(sideB.perpendicularBisector());
+    Line sa = sideA.perpendicularBisector();
+    Line sb = sideB.perpendicularBisector();
+
+    //If either sa's or sb's perp-bisec is vertical,
+    //we simply switch that one over to using sideC's perp-bisec
+    //to avoid the problem entirely
+    bool flag = false;
+    if(sa.is_vertical) {
+        flag = true;
+        sa = sideC.perpendicularBisector();
+    }
+    else if(sb.is_vertical) {
+        sb = sideC.perpendicularBisector();
+    }
+
+    Point circumcenter = sa.intersection(sb);
     double rad = circumcenter.distance(a);
+
     return Circle(circumcenter, (double) rad);
 }
 

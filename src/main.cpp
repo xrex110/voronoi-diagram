@@ -10,6 +10,9 @@
 
 #include "GEOM.hpp"
 
+SDL_Window* window;
+SDL_Renderer* renderer;
+
 //Look up remove/erase idiom for explanation for this macro
 #define REMOVE_ELEM_FROM_VECTOR(vec, elem) vec.erase(std::remove(vec.begin(), vec.end(), elem), vec.end())
 
@@ -18,31 +21,58 @@ std::vector<Point> randomPoints(int width, int height, int num_points);
 void DrawTriangle(SDL_Renderer* renderer, Triangle tri);
 void DrawCircle(SDL_Renderer * renderer, int centreX, int centreY, int radius);
 std::vector<Triangle> delauney(std::vector<Point> sites);
+bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles);
+void presentWindow();
 
 //main must have this signature for SDL2.0 to work properly
 int main(int arc, char* argv[]) {
     printf("Hello World!\n");
 
-    std::vector<Point> sites = randomPoints(512, 512, 10);
-
-    std::cout << "Points before delauney:" << std::endl;
-    for(Point pt : sites) {
-        std::cout << "\t" << pt << std::endl;
+    //Use below to run the algorithm a lot
+    /*for(int i = 0; i < 1000; i++) {
+        std::vector<Point> sites = randomPoints(512, 512,64);
+        std::vector<Triangle> triangles = delauney(sites);
+        if(!verifyDelauney(sites, triangles)) {
+            std::cout << "Points that failed:" << std::endl;
+            for(Point pt : sites) {
+                std::cout << "\t" << pt << std::endl;
+            }
+        }
+        else {
+            //std::cout << "Run success: " << i <<"\n";
+        }
     }
 
+    std::cout <<"ALL SUCCESS\n";*/
+    
+    std::vector<Point> sites = randomPoints(512, 512,128);
     std::vector<Triangle> triangles = delauney(sites);
-
-    //std::vector<LineSegment> edges = voronoi(512, 512, sites);
-    //printf("LMAO\n");
     createWindow(512, 512, sites, triangles);
+    std::cout << "Verify delauney:\n";
+    std::cout << verifyDelauney(sites, triangles) << "\n";
+    presentWindow();
 
     return 0;
+}
+
+bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles) {
+    bool soon = true;
+    for(Point pt : sites) {
+        for(Triangle tri : triangles) {
+            Circle c = tri.circumcircle();
+            if(c.isPointInside2(pt)) {
+                std::cout << "\tViolating " << tri << "\n"; 
+                soon = false;
+            }
+        }
+    }
+    return soon;
 }
 
 //Algorithm description taken from http://paulbourke.net/papers/triangulate/
 //The paper has an AMAZING explanation of how this algorithm works
 std::vector<Triangle> delauney(std::vector<Point> sites) {
-    printf("\nEntered delauney triangulation\n");
+    //printf("\nEntered delauney triangulation\n");
 
     //Init triangle list, which will be final output
     std::vector<Triangle> triangle_list;
@@ -50,29 +80,6 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
     //Sort all points by x coordinate
     //This improves the runtime from O(n^2) to O(n^1.5) for reasons yet to be understood
     std::sort(sites.begin(), sites.end());   //Uses operator< for comparision, implemented for Point
-
-    //Determine supertriangle
-    /*double minX = sites.at(0).x;
-    double minY = sites.at(0).y;
-    double maxX = minX, maxY = minY;
-    for(std::vector<Point>::iterator it = sites.begin(); it != sites.end(); it++) {
-        if(it->x > maxX) maxX = it->x;
-        if(it->x < minX) minX = it->x;
-        if(it->y > maxY) maxY = it->y;
-        if(it->y < minY) minY = it->y;
-    }
-    //Now we have the smallest and largest x and y values
-    double diffX = maxX - minX;
-    double diffY = maxY - minY;
-    double diffMax = (diffX > diffY ? diffX : diffY) * 20;
-    double midX = (maxX + minX) / 2;
-    double midY = (maxY + minY) / 2;*/
-
-    //Now we setup the super triangle so that all points
-    //are contained within it
-    //Point pointA(midX - diffMax, midY - diffMax);
-    //Point pointB(midX, midY + diffMax);
-    //Point pointC(midX + diffMax, midY - diffMax);
 
     Point pointA(256, -2*512);
     Point pointB(-2*512, 512);
@@ -87,9 +94,13 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
     Triangle super_triangle(pointA, pointB, pointC);
     triangle_list.push_back(super_triangle);
 
+    Triangle debug_tri(Point(341, 213), Point(214, 5), Point(224, 305));
+    LineSegment cursedLine(Point(214, 5), Point(224, 305));
+
     //For each point in the sites list
     for(Point p : sites) {
         std::vector<LineSegment> edges;
+
         auto tri_end = triangle_list.end();
         for(auto it = triangle_list.begin(); it != tri_end; ++it) {
             Triangle tri = *it;
@@ -109,9 +120,10 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
         //ALL occurances of any such edge
         auto end = edges.end();
         for(auto it = edges.begin(); it != end; ++it) {
-            auto new_end = std::remove(it + 1, end, *it);
+            LineSegment e = *it;
+            auto new_end = std::remove(it + 1, end, e);
             if(new_end != end) {
-                end = std::remove(edges.begin(), new_end, *it);
+                end = std::remove(edges.begin(), new_end, e);
                 it--;
                 if(edges.begin() == end) break;
             }
@@ -124,6 +136,7 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
             Triangle new_t(p, edge.a, edge.b);
             triangle_list.push_back(new_t);
         }
+
     }
 
     //Before returning, we must remove from the traingle
@@ -139,8 +152,13 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
     }
     triangle_list.erase(tri_end, triangle_list.end());
 
-    std::cout << "Delauney triangulation finished" << std::endl;
+    //std::cout << "Delauney triangulation finished" << std::endl;
     //remove supertriangle vertices from sites list
+
+    REMOVE_ELEM_FROM_VECTOR(sites, pointA);
+    REMOVE_ELEM_FROM_VECTOR(sites, pointB);
+    REMOVE_ELEM_FROM_VECTOR(sites, pointC);
+
     return triangle_list;
 }
 
@@ -171,8 +189,8 @@ std::vector<Point> randomPoints(int width, int height, int num_points) {
 }
 
 void createWindow(int width, int height, std::vector<Point> sites, std::vector<Triangle> triangles) {
-    SDL_Window* window = NULL;
-    SDL_Renderer* renderer = NULL;
+    window = NULL;
+    renderer = NULL;
 
     if(SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("SDL broke, idk why!\n");
@@ -189,9 +207,10 @@ void createWindow(int width, int height, std::vector<Point> sites, std::vector<T
 
     //Draw triangles
     for(Triangle tri : triangles) {
-        /*Circle circum = tri.circumcircle();
-        SDL_SetRenderDrawColor(renderer, 0x0, 0xff, 0x0, SDL_ALPHA_OPAQUE);
-        DrawCircle(renderer, (int) circum.center.x, (int) circum.center.y, (int) circum.radius);*/
+        Circle circum = tri.circumcircle();
+        //Below two lines draw all the circumcircles as well
+        //SDL_SetRenderDrawColor(renderer, 0x0, 0xff, 0x0, SDL_ALPHA_OPAQUE);
+        //DrawCircle(renderer, (int) circum.center.x, (int) circum.center.y, (int) circum.radius);
         SDL_SetRenderDrawColor(renderer, 0x0, 0x0, 0xff, SDL_ALPHA_OPAQUE);
         DrawTriangle(renderer, tri);
     }
@@ -200,7 +219,9 @@ void createWindow(int width, int height, std::vector<Point> sites, std::vector<T
     for(Point pt : sites) {
         SDL_RenderDrawPoint(renderer, pt.x, pt.y);
     }
+}
 
+void presentWindow() {
     SDL_RenderPresent(renderer);
     
     bool quit = false;

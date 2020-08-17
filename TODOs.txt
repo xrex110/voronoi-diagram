@@ -2,6 +2,7 @@ Delauney Triangulation:
 	Add verify function
 	memoize triangle circumcirles from geom lib
 	look into converting some std::vectors to std::lists
+	Change supertriangle to reference implementation, see what happens
 	
 General:
 	Modern C++ approach for generating random points: https://stackoverflow.com/questions/7560114/random-number-c-in-some-range

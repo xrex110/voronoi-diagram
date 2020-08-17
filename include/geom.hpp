@@ -4,6 +4,10 @@
 #include <vector>
 #include <iostream>
 
+#define EPSILON  0.0000001
+
+bool compareDoubles(double x, double y);    //returns true if x == y
+
 class Point {
     public:
     double x, y;
@@ -45,7 +49,8 @@ class Circle {
     Point center;
     double radius;
     Circle(Point cent, double rad);
-    bool isPointInside(Point a);
+    bool isPointInside(Point a);    //circumference inclusive
+    bool isPointInside2(Point a);   //circumference exclusive
     friend std::ostream& operator<<(std::ostream& os, Circle p);
 };
 
