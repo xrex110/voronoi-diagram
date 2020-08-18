@@ -22,30 +22,16 @@ void DrawTriangle(SDL_Renderer* renderer, Triangle tri);
 void DrawCircle(SDL_Renderer * renderer, int centreX, int centreY, int radius);
 std::vector<Triangle> delauney(std::vector<Point> sites);
 bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles);
+template <class T> void printVector(std::vector<T> &vec);
+bool rigorDelauney(int rangeX, int rangeY, int numPoints, int numRuns, bool verbose);
 void presentWindow();
 
 //main must have this signature for SDL2.0 to work properly
 int main(int arc, char* argv[]) {
-    printf("Hello World!\n");
 
-    //Use below to run the algorithm a lot
-    /*for(int i = 0; i < 1000; i++) {
-        std::vector<Point> sites = randomPoints(512, 512,64);
-        std::vector<Triangle> triangles = delauney(sites);
-        if(!verifyDelauney(sites, triangles)) {
-            std::cout << "Points that failed:" << std::endl;
-            for(Point pt : sites) {
-                std::cout << "\t" << pt << std::endl;
-            }
-        }
-        else {
-            //std::cout << "Run success: " << i <<"\n";
-        }
-    }
+    //rigorDelauney(512, 512, 128, 2500, true);
 
-    std::cout <<"ALL SUCCESS\n";*/
-    
-    std::vector<Point> sites = randomPoints(512, 512,128);
+    std::vector<Point> sites = randomPoints(512, 512, 128);
     std::vector<Triangle> triangles = delauney(sites);
     createWindow(512, 512, sites, triangles);
     std::cout << "Verify delauney:\n";
@@ -53,6 +39,43 @@ int main(int arc, char* argv[]) {
     presentWindow();
 
     return 0;
+}
+
+template <class T>
+void printVector(std::vector<T> &vec) {
+    for(auto it = vec.begin(); it != vec.end(); ++it) {
+        std::cout << *it << "\n";
+    }
+}
+
+//Rigor tests delauney triangulation
+bool rigorDelauney(int rangeX, int rangeY, int numPoints, int numRuns, bool verbose) {
+    std::cout << "Begin rigor testing Delauney\n";
+    int failedRuns = 0;
+    for(int i = 0; i < numRuns; i++) {
+        std::vector<Point> sites = randomPoints(rangeX, rangeY, numPoints);
+        std::vector<Triangle> triangles = delauney(sites);
+        if(!verifyDelauney(sites, triangles)) {
+            std::cout << "Run " << i << "failed! Points that failed:" << std::endl;
+            for(Point pt : sites) {
+                std::cout << "\t" << pt << std::endl;
+            }
+            failedRuns++;
+        }
+        else {
+            if(verbose) {
+                std::cout << "Run " << i << " passed\n";
+            }
+        }
+    }
+    if(!failedRuns) {
+        std::cout << "Rigor testing Delauney: ALL SUCCESS\n";
+        return true;
+    }
+    else {
+        std::cout << "Rigor testing Delauney: " << failedRuns << " runs failed!\n";
+        return false;
+    }
 }
 
 bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles) {
@@ -81,9 +104,22 @@ std::vector<Triangle> delauney(std::vector<Point> sites) {
     //This improves the runtime from O(n^2) to O(n^1.5) for reasons yet to be understood
     std::sort(sites.begin(), sites.end());   //Uses operator< for comparision, implemented for Point
 
-    Point pointA(256, -2*512);
-    Point pointB(-2*512, 512);
-    Point pointC(2*512, 2*512);
+    double minX = sites.at(0).x;
+    double maxX = sites.at(sites.size() - 1).x;
+    double minY = sites.at(0).y;
+    double maxY = minY;
+    for(auto it = sites.begin(); it != sites.end(); ++it) {
+        if(it->y < minY) minY = it->y;
+        if(it->y > maxY) maxY = it->y;
+    }
+
+    double diffX = maxX - minX;
+    double diffY = maxY - minY;
+
+    //These three are the vertices of the supertriangle
+    Point pointA((int) diffX / 2, -2 * diffY);
+    Point pointB(-2 * diffX, diffY);
+    Point pointC(2 * diffX, 2 * diffY);
 
     //Add the vertexes of super triangle to the sites list
     sites.push_back(pointA);

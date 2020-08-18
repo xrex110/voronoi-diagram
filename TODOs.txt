@@ -1,5 +1,6 @@
 Delauney Triangulation:
 	memoize triangle circumcirles from geom lib
+	Pick the largest range (x or y) to be sorted for speed
 	look into converting some std::vectors to std::lists
 
 General:
