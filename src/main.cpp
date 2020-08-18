@@ -8,23 +8,13 @@
 #include <ctime>
 #include <SDL2/SDL.h>
 
-#include "GEOM.hpp"
+#include "main.hpp"
 
 SDL_Window* window;
 SDL_Renderer* renderer;
 
 //Look up remove/erase idiom for explanation for this macro
 #define REMOVE_ELEM_FROM_VECTOR(vec, elem) vec.erase(std::remove(vec.begin(), vec.end(), elem), vec.end())
-
-void createWindow(int width, int height, std::vector<Point> sites, std::vector<Triangle> triangles);
-std::vector<Point> randomPoints(int width, int height, int num_points);
-void DrawTriangle(SDL_Renderer* renderer, Triangle tri);
-void DrawCircle(SDL_Renderer * renderer, int centreX, int centreY, int radius);
-std::vector<Triangle> delauney(std::vector<Point> sites);
-bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles);
-template <class T> void printVector(std::vector<T> &vec);
-bool rigorDelauney(int rangeX, int rangeY, int numPoints, int numRuns, bool verbose);
-void presentWindow();
 
 //main must have this signature for SDL2.0 to work properly
 int main(int arc, char* argv[]) {

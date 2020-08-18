@@ -7,8 +7,6 @@
 
 #include "geom.hpp"
 
-extern SDL_Renderer* renderer;
-
 bool compareDoubles(double x, double y) {
     return abs(x - y) <= EPSILON;
 }
@@ -158,9 +156,6 @@ bool Circle::isPointInside(Point a) {
 bool Circle::isPointInside2(Point a) {
     double dist = pow(center.x - a.x, 2) + pow(center.y - a.y, 2);
     double rad2 = pow(radius, 2);
-    /*if(dist < rad2 && !compareDoubles(dist, rad2)) {
-        SDL_RenderDrawLineF(renderer, center.x, center.y, a.x, a.y);
-    }*/
     return (dist < rad2  && !compareDoubles(dist, rad2));
 }
 
