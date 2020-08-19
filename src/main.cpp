@@ -5,6 +5,8 @@
 #include <cmath>
 #include <vector>
 #include <set>
+#include <unordered_set>
+#include <limits>
 #include <ctime>
 #include <SDL2/SDL.h>
 
@@ -18,14 +20,30 @@ SDL_Renderer* renderer;
 
 //main must have this signature for SDL2.0 to work properly
 int main(int arc, char* argv[]) {
-
     //rigorDelauney(512, 512, 128, 2500, true);
 
     std::vector<Point> sites = randomPoints(512, 512, 128);
+    /*std::vector<Point> sites;
+    sites.push_back(Point(263, 415));
+    sites.push_back(Point(218, 340));
+    sites.push_back(Point(471, 296));
+    sites.push_back(Point(154, 66));
+    sites.push_back(Point(191, 155));
+    sites.push_back(Point(510, 35));
+    sites.push_back(Point(312, 34));
+    sites.push_back(Point(212, 156));
+    sites.push_back(Point(286, 437));
+    sites.push_back(Point(138, 369));*/
+    std::cout << "SITES:\n"; 
+    //printVector(sites);
+
     std::vector<Triangle> triangles = delauney(sites);
-    createWindow(512, 512, sites, triangles);
+    
     std::cout << "Verify delauney:\n";
     std::cout << verifyDelauney(sites, triangles) << "\n";
+
+    std::vector<Cell> voronoi = delauneyToVoronoi(sites, triangles);
+    createWindow(512, 512, sites, triangles, voronoi);
     presentWindow();
 
     return 0;
@@ -81,6 +99,204 @@ bool verifyDelauney(std::vector<Point> sites, std::vector<Triangle> triangles) {
     }
     return soon;
 }
+
+template <typename T>
+bool vectorSetInsert(std::vector<T>& vec, T elem) {
+    for(T i : vec) {
+        if(i == elem) return false;
+    }
+    vec.push_back(elem);
+    return true;
+}
+
+std::vector<Cell> delauneyToVoronoi(std::vector<Point> sites, std::vector<Triangle> triangles) {
+    std::cout << "Start converting Delauney triangulation to Voronoi Diagram\n";
+
+    std::vector<Cell> voronoiCells;
+    for(Point p : sites) {
+        voronoiCells.push_back(Cell(p));
+    }
+
+    Line bound1(0, 0, false, 0); //Top line
+    Line bound2(0, 0, true, 0); //left line
+    Line bound3(0, 0, true, 512); //right line
+    Line bound4(0, 512, false, 0); //bottom line
+
+    for(Triangle tri : triangles) {
+        std::vector<LineSegment> edgesShared;
+        for(Triangle bri : triangles) {
+            if(tri == bri) continue;
+            LineSegment* shared = new LineSegment(Point(0, 0), Point(0,0));
+            if(tri.sharedEdge(bri, shared)) {
+                LineSegment shared_obj = *shared;
+                LineSegment vEdge(tri.circumcircle().center, bri.circumcircle().center);
+                for(auto it = voronoiCells.begin(); it != voronoiCells.end(); ++it) {
+                    if(it->site == shared_obj.a || it->site == shared_obj.b) {
+                        //std::cout << "Added edge " << vEdge << "\n";
+                        it->addEdge(vEdge);
+                    }
+                }
+                edgesShared.push_back(*shared);
+            }
+            delete shared;
+        }
+        //std::cout << "Triangle " << tri << " has " << edgesShared.size() << " shared edges\n";
+        //edgesShared holds all the shared edges
+        std::vector<LineSegment> unsharedEdges;
+        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideA) == edgesShared.end()) unsharedEdges.push_back(tri.sideA);
+        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideB) == edgesShared.end()) unsharedEdges.push_back(tri.sideB);
+        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideC) == edgesShared.end()) unsharedEdges.push_back(tri.sideC);
+        //std::cout << "Triangle " << tri << " has " << unsharedEdges.size() << " UNshared edges\n";
+
+        for(LineSegment uEdge : unsharedEdges) {
+            Point inter1 = uEdge.perpendicularBisector().intersection(bound1);
+            Point inter2 = uEdge.perpendicularBisector().intersection(bound2);
+            Point inter3 = uEdge.perpendicularBisector().intersection(bound3);
+            Point inter4 = uEdge.perpendicularBisector().intersection(bound4);
+            
+            LineSegment minDist(tri.circumcircle().center, inter1);
+            LineSegment dist2(tri.circumcircle().center, inter2);
+            LineSegment dist3(tri.circumcircle().center, inter3);
+            LineSegment dist4(tri.circumcircle().center, inter4);
+            if(dist2.lengthSqr() < minDist.lengthSqr()) minDist = dist2;
+            if(dist3.lengthSqr() < minDist.lengthSqr()) minDist = dist3;
+            if(dist4.lengthSqr() < minDist.lengthSqr()) minDist = dist4;
+
+            for(auto it = voronoiCells.begin(); it != voronoiCells.end(); ++it) {
+                if(it->site == uEdge.a || it->site == uEdge.b) {
+                    //std::cout << "Added edge " << minDist << "\n";
+                    it->addEdge(minDist);
+                }
+            }
+        }
+    }
+
+    return voronoiCells;
+}
+
+/*std::vector<Cell> delauneyToVoronoi(std::vector<Point> sites, std::vector<Triangle> triangles) {
+    std::cout << "Start converting Delauney triangulation to Voronoi Diagram\n";
+
+    std::vector<Cell> voronoiCells;
+
+    //define four lines which form the bounds of the canvas
+    Line bound1(0, 0, false, 0); //Top line
+    Line bound2(0, 0, true, 0); //left line
+    Line bound3(0, 0, true, 512); //right line
+    Line bound4(0, 512, false, 0); //bottom line
+
+    for(Point p : sites) {
+        std::cout << "OPERATING ON " << p << "\n";
+        int triangle_count = 0;
+        std::vector<Point> vertices;
+        std::vector<Line> lines;
+        for(Triangle tri : triangles) {
+            if(tri.pointMatch(p)) {
+                //Intersection of perpendicular bisector of any two sides 
+                //of this triangle should form ONE point of the voronoi cell about 
+                //this point. So the center of the triangle's circumcircle will work
+                std::cout << "\t Triangle: " << tri << "\n";
+
+                Circle c = tri.circumcircle();
+                vertices.push_back(c.center);
+                Point midA((tri.sideA.a.x + tri.sideA.b.x)/2, (tri.sideA.a.y + tri.sideA.b.y)/2);
+                Point midB((tri.sideB.a.x + tri.sideB.b.x)/2, (tri.sideB.a.y + tri.sideB.b.y)/2);
+                Point midC((tri.sideC.a.x + tri.sideC.b.x)/2, (tri.sideC.a.y + tri.sideC.b.y)/2);
+
+                //vertices.push_back(midA);
+                //vertices.push_back(midB);
+                //vertices.push_back(midC);
+
+                vectorSetInsert(lines, tri.sideA.perpendicularBisector());
+                vectorSetInsert(lines, tri.sideB.perpendicularBisector());
+                vectorSetInsert(lines, tri.sideC.perpendicularBisector());
+            }
+        }
+
+        std::vector<LineSegment> edges;
+        //Find the two closest points to each point, and form edges to them
+        for(Line line : lines) {
+            std::cout << "\tEvaluating line: " << line << "\n";
+            int num_points = 0;
+            Point pts[2];
+            for(Point vert : vertices) {
+                if(line.doesPointSatisfy(vert)) {
+                    //vert lines on line somewhere
+                    pts[num_points++] = vert;
+                    if(num_points >= 2) break;
+                }
+            }
+            if(num_points == 2) {
+                edges.push_back(LineSegment(pts[0], pts[1]));
+            }
+            else if(num_points == 1) {
+                std::cout << "\t\tThis is a corner edge!\n";
+            }
+            else {
+                std::cout << "\t\tWHACK? num_points: " << num_points << "\n";
+            }
+        }
+
+        Cell newCell(p);
+        for(LineSegment ls : edges) {
+            newCell.addEdge(ls);
+        }
+        voronoiCells.push_back(newCell);
+    }
+    return voronoiCells;
+}*/
+
+/*std::vector<Cell> delauneyToVoronoi(std::vector<Point> sites, std::vector<Triangle> triangles) {
+    std::cout << "Start converting Delauney triangulation to Voronoi Diagram\n";
+
+    std::vector<Cell> voronoiCells;
+
+    //define four lines which form the bounds of the canvas
+    Line bound1(0, 0, false, 0); //Top line
+    Line bound2(0, 0, true, 0); //left line
+    Line bound3(0, 0, true, 512); //right line
+    Line bound4(0, 512, false, 0); //bottom line
+
+    for(Point p : sites) {
+        std::cout << "OPERATING ON " << p << "\n";
+        int triangle_count = 0;
+        std::vector<Point> vertices;
+        std::vector<Line> lines;
+        for(Triangle tri : triangles) {
+            if(tri.pointMatch(p)) {
+                //Intersection of perpendicular bisector of any two sides 
+                //of this triangle should form ONE point of the voronoi cell about 
+                //this point. So the center of the triangle's circumcircle will work
+                Circle c = tri.circumcircle();
+                vertices.push_back(c.center);
+                vectorSetInsert(lines, tri.sideA.perpendicularBisector());
+                vectorSetInsert(lines, tri.sideB.perpendicularBisector());
+                vectorSetInsert(lines, tri.sideC.perpendicularBisector());
+            }
+        }
+        std::vector<LineSegment> edges;
+        //Find the two closest points to each point, and form edges to them
+
+        for(auto it = vertices.begin(); it != vertices.end() - 1; ++it) {
+            for(auto kt = it + 1; kt != vertices.end(); kt++) {
+                LineSegment this_line(*it, *kt); 
+                for(Line ln : lines) {
+                    if(this_line.line == ln) {
+                        edges.push_back(this_line);;
+                        break;
+                    }
+                }
+            }
+        }
+
+        Cell newCell(p);
+        for(LineSegment ls : edges) {
+            newCell.addEdge(ls);
+        }
+        voronoiCells.push_back(newCell);
+    }
+    return voronoiCells;
+}*/
 
 //Algorithm description taken from http://paulbourke.net/papers/triangulate/
 //The paper has an AMAZING explanation of how this algorithm works
@@ -214,7 +430,8 @@ std::vector<Point> randomPoints(int width, int height, int num_points) {
     return points;
 }
 
-void createWindow(int width, int height, std::vector<Point> sites, std::vector<Triangle> triangles) {
+void createWindow(int width, int height, std::vector<Point> sites, std::vector<Triangle> triangles,
+                    std::vector<Cell> voronoi) {
     window = NULL;
     renderer = NULL;
 
@@ -232,13 +449,18 @@ void createWindow(int width, int height, std::vector<Point> sites, std::vector<T
     SDL_RenderFillRect(renderer, NULL);
 
     //Draw triangles
-    for(Triangle tri : triangles) {
+    /*for(Triangle tri : triangles) {
         Circle circum = tri.circumcircle();
         //Below two lines draw all the circumcircles as well
         //SDL_SetRenderDrawColor(renderer, 0x0, 0xff, 0x0, SDL_ALPHA_OPAQUE);
         //DrawCircle(renderer, (int) circum.center.x, (int) circum.center.y, (int) circum.radius);
         SDL_SetRenderDrawColor(renderer, 0x0, 0x0, 0xff, SDL_ALPHA_OPAQUE);
         DrawTriangle(renderer, tri);
+    }*/
+
+    for(Cell c : voronoi) {
+        SDL_SetRenderDrawColor(renderer, 0x0, 0xff, 0x0, SDL_ALPHA_OPAQUE);
+        DrawCell(renderer, c);
     }
 
     SDL_SetRenderDrawColor(renderer, 0xff, 0x0, 0x0, SDL_ALPHA_OPAQUE);
@@ -263,6 +485,12 @@ void presentWindow() {
     SDL_DestroyWindow(window);
     printf("Program ended\n");
     SDL_Quit();
+}
+
+void DrawCell(SDL_Renderer* renderer, Cell cell) {
+    for(LineSegment ln : cell.edges) {
+        SDL_RenderDrawLineF(renderer, ln.a.x, ln.a.y, ln.b.x, ln.b.y);
+    }
 }
 
 void DrawTriangle(SDL_Renderer* renderer, Triangle tri) {

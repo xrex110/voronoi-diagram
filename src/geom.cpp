@@ -16,6 +16,8 @@ Point::Point() : x(0), y(0) {}
 
 Point::Point(double a, double b) : x(a), y(b) {}
 
+Point::Point(const Point& a) : x(a.x), y(a.y) {}
+
 bool Point::operator==(Point pt) {
     return (compareDoubles(x, pt.x) && compareDoubles(y, pt.y));
 }
@@ -26,6 +28,10 @@ bool Point::operator<(Point pt) {
 
 double Point::distance(Point b) {
     return sqrt(pow(x - b.x, 2) + pow(y - b.y, 2));
+}
+
+double Point::distanceSqr(Point b) {
+    return pow(x - b.x, 2) + pow(y - b.y, 2);
 }
 
 std::ostream& operator<<(std::ostream& os, Point p) {
@@ -67,6 +73,28 @@ Line::Line(double slope, double y_intercept, bool is_vert, double vert_x) {
     }
 }
 
+bool Line::operator==(Line l) {
+    if(is_vertical && l.is_vertical) {  //both are vertical
+        return compareDoubles(vert_x, l.vert_x);
+    }
+    else if(!is_vertical && !l.is_vertical) {   //both are not vertical
+        return (compareDoubles(slope, l.slope) && compareDoubles(y_intercept, l.y_intercept));
+    }
+    else {  //One is vertical and the other isn't, it's not possible for them to be equal
+        return false;
+    }
+}
+
+bool Line::doesPointSatisfy(Point a) {
+    if(is_vertical) {
+        if(compareDoubles(a.x, vert_x)) return true;
+        else return false;
+    }
+    else {
+        return (compareDoubles(a.y, (a.x * slope + y_intercept)));
+    }
+}
+
 //Case for parallelism
 Point Line::intersection(Line l) {
     double intersection_x, intersection_y;
@@ -99,7 +127,7 @@ std::ostream& operator<<(std::ostream& os, Line p) {
         os << "Line equation: vertical at x = " << p.vert_x;
     }
     else {
-        os << "Line equation: y = " << p.slope << "x + " << p.y_intercept;
+        os << "Line equation: y = " << p.slope << "x + " << p.y_intercept << ", vertical: " << p.is_vertical << ", vert_x: " << p.vert_x;
     }
     return os;
 }
@@ -108,6 +136,10 @@ std::ostream& operator<<(std::ostream& os, Line p) {
 LineSegment::LineSegment(Point x, Point y) : a(x), b(y), line(Line(a, b)) {}
 
 LineSegment::LineSegment(double x1, double y1, double x2, double y2) : LineSegment(Point(x1, y1), Point(x2, y2)) {}
+
+double LineSegment::lengthSqr() {
+    return a.distanceSqr(b);
+}
 
 Line LineSegment::perpendicularBisector() {
     Point mid((a.x + b.x)/2, (a.y + b.y)/2);
@@ -177,6 +209,22 @@ bool Triangle::operator==(Triangle t) {
     return ret;
 }
 
+bool Triangle::sharedEdge(Triangle t, LineSegment* shared) {
+    if (sideA == t.sideA || sideA == t.sideB || sideA == t.sideC) {
+        *shared = sideA;
+    }
+    else if(sideB == t.sideA || sideB == t.sideB || sideB == t.sideC) {
+        *shared = sideB;
+    }
+    else if(sideC == t.sideA || sideC == t.sideB || sideC == t.sideC) {
+        *shared = sideC;
+    }
+    else {
+        return false;
+    }
+    return true;
+}
+
 Circle Triangle::circumcircle() {
     //Intersection of the perpendicular bisectors of any
     //two edges of a triangle is the center of the circumcircle of a 
@@ -225,6 +273,9 @@ Cell::Cell(Point pt) {
 }
 
 void Cell::addEdge(LineSegment edge) {
+    for(LineSegment ln : edges) {
+        if(edge == ln) return;  //Don't add if it already exists
+    }
     edges.push_back(edge);
 }
 
