@@ -1,10 +1,12 @@
 Delauney Triangulation:
 	memoize triangle circumcirles from geom lib
 	Pick the largest range (x or y) to be sorted for speed
-	look into converting some std::vectors to std::lists
+	look into converting some std::vectors to std::lists and using sets more often
 
 Voronoi:
-	It would be HUGE if we could do a unordered_set (hashing yuk) for Lines, would make so many things Super Fast
+	make it not garbage -- we're halfway there
+	vertical intersection needs to be looked at and dealt with
+	Weird dots on the edge of the screen need to be investigated
 
 General:
 	Modern C++ approach for generating random points: https://stackoverflow.com/questions/7560114/random-number-c-in-some-range

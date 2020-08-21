@@ -44,6 +44,7 @@ class LineSegment {
     LineSegment(Point a, Point b);
     LineSegment(double x1, double y1, double x2, double y2);
     double lengthSqr();
+    void copy(LineSegment cp);
     Line perpendicularBisector();
     bool operator==(LineSegment e);
     friend std::ostream& operator<<(std::ostream& os, LineSegment p);
@@ -67,7 +68,7 @@ class Triangle {
     bool operator==(Triangle t);
     Circle circumcircle();
     bool pointMatch(Point p);
-    bool sharedEdge(Triangle t, LineSegment* shared);
+    bool sharedEdge(Triangle t, LineSegment& shared);
     friend std::ostream& operator<<(std::ostream& os, Triangle p);
 };
 

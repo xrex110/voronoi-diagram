@@ -16,4 +16,5 @@ bool rigorDelauney(int rangeX, int rangeY, int numPoints, int numRuns, bool verb
 std::vector<Cell> delauneyToVoronoi(std::vector<Point> sites, std::vector<Triangle> triangles);
 void presentWindow();
 
+
 #endif

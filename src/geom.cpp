@@ -168,6 +168,12 @@ Line LineSegment::perpendicularBisector() {
     return Line(p_slope, p_y_intercept, p_is_vertical, p_vert_x);
 }
 
+void LineSegment::copy(LineSegment cp) {
+    a = cp.a;
+    b = cp.b;
+    line = cp.line;
+}
+
 bool LineSegment::operator==(LineSegment e) {
     return ((this->a == e.a && this->b == e.b) || (this->b == e.a && this->a == e.b));
 }
@@ -209,15 +215,15 @@ bool Triangle::operator==(Triangle t) {
     return ret;
 }
 
-bool Triangle::sharedEdge(Triangle t, LineSegment* shared) {
+bool Triangle::sharedEdge(Triangle t, LineSegment& shared) {
     if (sideA == t.sideA || sideA == t.sideB || sideA == t.sideC) {
-        *shared = sideA;
+        shared.copy(sideA);
     }
     else if(sideB == t.sideA || sideB == t.sideB || sideB == t.sideC) {
-        *shared = sideB;
+        shared.copy(sideB);
     }
     else if(sideC == t.sideA || sideC == t.sideB || sideC == t.sideC) {
-        *shared = sideC;
+        shared.copy(sideC);
     }
     else {
         return false;

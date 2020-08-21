@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <limits>
 #include <ctime>
+#include <chrono>
 #include <SDL2/SDL.h>
 
 #include "main.hpp"
@@ -22,27 +23,27 @@ SDL_Renderer* renderer;
 int main(int arc, char* argv[]) {
     //rigorDelauney(512, 512, 128, 2500, true);
 
-    std::vector<Point> sites = randomPoints(512, 512, 128);
-    /*std::vector<Point> sites;
-    sites.push_back(Point(263, 415));
-    sites.push_back(Point(218, 340));
-    sites.push_back(Point(471, 296));
-    sites.push_back(Point(154, 66));
-    sites.push_back(Point(191, 155));
-    sites.push_back(Point(510, 35));
-    sites.push_back(Point(312, 34));
-    sites.push_back(Point(212, 156));
-    sites.push_back(Point(286, 437));
-    sites.push_back(Point(138, 369));*/
+    std::vector<Point> sites = randomPoints(512, 512, 256);
     std::cout << "SITES:\n"; 
     //printVector(sites);
 
+    auto start = std::chrono::high_resolution_clock::now();
     std::vector<Triangle> triangles = delauney(sites);
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << "Delauney took " << duration.count() << "ms to run\n";
     
     std::cout << "Verify delauney:\n";
     std::cout << verifyDelauney(sites, triangles) << "\n";
 
+    start = std::chrono::high_resolution_clock::now();
     std::vector<Cell> voronoi = delauneyToVoronoi(sites, triangles);
+    end = std::chrono::high_resolution_clock::now();
+
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << "Delauney to Voronoi took " << duration.count() << "ms to run\n";
+
     createWindow(512, 512, sites, triangles, voronoi);
     presentWindow();
 
@@ -110,62 +111,48 @@ bool vectorSetInsert(std::vector<T>& vec, T elem) {
 }
 
 std::vector<Cell> delauneyToVoronoi(std::vector<Point> sites, std::vector<Triangle> triangles) {
-    std::cout << "Start converting Delauney triangulation to Voronoi Diagram\n";
+
+    Line boundingLines[] = {
+        Line(0, 0, false, 0), //Top line,
+        Line(0, 0, true, 0), //left line
+        Line(0, 0, true, 512), //right line
+        Line(0, 512, false, 0), //bottom line
+    };
 
     std::vector<Cell> voronoiCells;
     for(Point p : sites) {
         voronoiCells.push_back(Cell(p));
     }
 
-    Line bound1(0, 0, false, 0); //Top line
-    Line bound2(0, 0, true, 0); //left line
-    Line bound3(0, 0, true, 512); //right line
-    Line bound4(0, 512, false, 0); //bottom line
-
     for(Triangle tri : triangles) {
-        std::vector<LineSegment> edgesShared;
+        std::vector<LineSegment> unsharedEdges = {tri.sideA, tri.sideB, tri.sideC};
         for(Triangle bri : triangles) {
             if(tri == bri) continue;
-            LineSegment* shared = new LineSegment(Point(0, 0), Point(0,0));
+            LineSegment shared(Point(0, 0), Point(0, 0)); //= new LineSegment(Point(0, 0), Point(0,0));
             if(tri.sharedEdge(bri, shared)) {
-                LineSegment shared_obj = *shared;
+                //if tri shares this an edge with bri
+                LineSegment shared_obj = shared;
                 LineSegment vEdge(tri.circumcircle().center, bri.circumcircle().center);
                 for(auto it = voronoiCells.begin(); it != voronoiCells.end(); ++it) {
                     if(it->site == shared_obj.a || it->site == shared_obj.b) {
-                        //std::cout << "Added edge " << vEdge << "\n";
                         it->addEdge(vEdge);
                     }
                 }
-                edgesShared.push_back(*shared);
+                REMOVE_ELEM_FROM_VECTOR(unsharedEdges, shared);
             }
-            delete shared;
         }
-        //std::cout << "Triangle " << tri << " has " << edgesShared.size() << " shared edges\n";
-        //edgesShared holds all the shared edges
-        std::vector<LineSegment> unsharedEdges;
-        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideA) == edgesShared.end()) unsharedEdges.push_back(tri.sideA);
-        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideB) == edgesShared.end()) unsharedEdges.push_back(tri.sideB);
-        if(std::find(edgesShared.begin(), edgesShared.end(), tri.sideC) == edgesShared.end()) unsharedEdges.push_back(tri.sideC);
-        //std::cout << "Triangle " << tri << " has " << unsharedEdges.size() << " UNshared edges\n";
 
         for(LineSegment uEdge : unsharedEdges) {
-            Point inter1 = uEdge.perpendicularBisector().intersection(bound1);
-            Point inter2 = uEdge.perpendicularBisector().intersection(bound2);
-            Point inter3 = uEdge.perpendicularBisector().intersection(bound3);
-            Point inter4 = uEdge.perpendicularBisector().intersection(bound4);
-            
-            LineSegment minDist(tri.circumcircle().center, inter1);
-            LineSegment dist2(tri.circumcircle().center, inter2);
-            LineSegment dist3(tri.circumcircle().center, inter3);
-            LineSegment dist4(tri.circumcircle().center, inter4);
-            if(dist2.lengthSqr() < minDist.lengthSqr()) minDist = dist2;
-            if(dist3.lengthSqr() < minDist.lengthSqr()) minDist = dist3;
-            if(dist4.lengthSqr() < minDist.lengthSqr()) minDist = dist4;
+            LineSegment minBoundingEdge(tri.circumcircle().center, uEdge.perpendicularBisector().intersection(boundingLines[0]));
+            for(int i = 1; i < 4; i++) {
+                Point intersection = uEdge.perpendicularBisector().intersection(boundingLines[i]);
+                LineSegment circumToIntersection(tri.circumcircle().center, intersection);
+                if(circumToIntersection.lengthSqr() < minBoundingEdge.lengthSqr()) minBoundingEdge = circumToIntersection;
+            }
 
             for(auto it = voronoiCells.begin(); it != voronoiCells.end(); ++it) {
                 if(it->site == uEdge.a || it->site == uEdge.b) {
-                    //std::cout << "Added edge " << minDist << "\n";
-                    it->addEdge(minDist);
+                    it->addEdge(minBoundingEdge);
                 }
             }
         }
@@ -296,7 +283,11 @@ void removeFromVector(std::vector<T> list, T elem) {
 
 std::vector<Point> randomPoints(int width, int height, int num_points) {
     std::vector<Point> points;
-    std::srand(std::time(NULL));    //Current systime as seed
+    auto seed = std::time(NULL);
+
+    std::cout << "Generating " << num_points << " points in (" << width << ", " << height << ") with seed = " << seed << "\n";
+
+    std::srand(seed);    //Current systime as seed
     for(int i = 0; i < num_points; i++) {
         int x_pt = (std::rand() % width) + 1;
         int y_pt = (std::rand() % height) + 1;
